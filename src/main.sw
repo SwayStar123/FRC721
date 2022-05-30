@@ -7,6 +7,7 @@ use std::assert::require;
 use std::revert::revert;
 use std::chain::auth::{Sender, msg_sender};
 use std::result::Result;
+use std::context::call_frames::contract_id;
 
 abi MyContract {
     pub fn balanceOf(owner: Address) -> u64;
@@ -61,9 +62,10 @@ impl MyContract for Contract {
     }
 
     pub fn approve(to: Address, tokenId: u64) {
-        let owner = ownerOf(tokenId);
+        let x = abi(MyContract, contract_id().value);
+        let owner = x.ownerOf(tokenId);
         require(to != owner, "FRC721: approval to current owner");
-        require((getSender() == owner) || isApprovedForAll(owner, getSender()), "FRC721: approve caller is not token owner nor approved for all");
+        require((getSender() == owner) || x.isApprovedForAll(owner, getSender()), "FRC721: approve caller is not token owner nor approved for all");
     }
 
     pub fn getApproved(tokenId: u64) -> Address {
@@ -81,6 +83,8 @@ impl MyContract for Contract {
         internalTransfer(from, to, tokenId);
     }
 }
+
+
 
 fn exists(tokenId: u64) -> bool {
     return storage.owners.get(tokenId) != ~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000);
@@ -107,8 +111,9 @@ fn internalSetApprovalForAll(owner: Address, operator: Address, approved: bool) 
 }
 
 fn isApprovedOrOwner(spender: Address, tokenId: u64) -> bool {
-    let owner = ownerOf(tokenId);
-    return(spender == owner || isApprovedForAll(owner, spender) || getApproved(tokenId) == spender);
+    let x = abi(MyContract, contract_id().value);
+    let owner = x.ownerOf(tokenId);
+    return(spender == owner || x.isApprovedForAll(owner, spender) || x.getApproved(tokenId) == spender);
 }
 
 fn beforeTokenTransfer(from: Address, to: Address, tokenId: u64) {
@@ -120,13 +125,14 @@ fn afterTokenTransfer(from: Address, to: Address, tokenId: u64) {
 }
 
 fn internalTransfer(from: Address, to: Address, tokenId: u64) {
-    require(ownerOf(tokenId) == from, "FRC721: transfer from incorrect owner");
+    let x = abi(MyContract, contract_id().value);
+    require(x.ownerOf(tokenId) == from, "FRC721: transfer from incorrect owner");
     require(to != ~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000), "FRC721: transfer to the zero address");
 
     beforeTokenTransfer(from, to, tokenId);
 
     //clear approvals from previous owner
-    approve(~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000), tokenId);
+    x.approve(~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000), tokenId);
 
     storage.balances.insert(from, storage.balances.get(from) - 1);
     storage.balances.insert(to, storage.balances.get(from) + 1);
@@ -148,11 +154,12 @@ pub fn mint(to: Address, tokenId: u64) {
 }
 
 pub fn burn(tokenId: u64) {
-    let owner: Address = ownerOf(tokenId);
+    let x = abi(MyContract, contract_id().value);
+    let owner: Address = x.ownerOf(tokenId);
 
     beforeTokenTransfer(owner, ~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000), tokenId);
 
-    approve(~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000), tokenId);
+    x.approve(~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000), tokenId);
     storage.balances.insert(owner, storage.balances.get(owner) - 1);
     //deleting the owner
     storage.owners.insert(tokenId, ~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000));
