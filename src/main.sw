@@ -6,14 +6,16 @@ use std::address::Address;
 use std::assert::require;
 use std::chain::msg_sender;
 
-// const NAME_LEN: u64 = 11;
-// const SYMBOL_LEN: u64 = 6;
-
 abi MyContract {
     pub fn balanceOf(owner: Address) -> u64;
     pub fn ownerOf(tokenId: u64) -> Address;
     pub fn getName() -> str[11];
     pub fn getSymbol() -> str[6];
+    pub fn isApprovedForAll(owner: Address, operator: Address) -> bool;
+    pub fn approve(to: Address, tokenId: u64);
+    pub fn getApproved(tokenId: u64) -> Address;
+    pub fn setApprovalForAll(operator: Address, approved: bool);
+    pub fn transferFrom(from: Address, to: Address, tokenId: u64);
 }
 
 storage {
@@ -51,13 +53,6 @@ impl MyContract for Contract {
         return storage.symbol;
     }
 
-    // pub fn tokenURI(tokenId: u64) -> str[5] { 
-    //     require(exists(tokenId), "FRC721: URI query for non-existant token")
-
-    //     let bURI = baseURI();
-    //     return bURI + //tokenId.toString() replace with actual code
-    // }
-
     pub fn isApprovedForAll(owner: Address, operator: Address) -> bool {
         return storage.operatorApprovals.get(owner).get(operator);
     }
@@ -78,10 +73,6 @@ impl MyContract for Contract {
         internalSetApprovalForAll(getSender(), operator, approved);
     }
 
-    pub fn isApprovedForAll(owner: Address, operator: Address) -> bool {
-        return storage.operatorApprovals.get(owner).get(operator);
-    }
-
     pub fn transferFrom(from: Address, to: Address, tokenId: u64) {
         require(isApprovedOrOwner(getSender(), tokenId), "FRC721: caller is not token owner nor approved");
 
@@ -93,27 +84,20 @@ fn exists(tokenId: u64) -> bool {
     return storage.owners.get(tokenId) != Address::from(0);
 }
 
-//replace with your own base URI
-// fn baseURI() -> str[0] {
-//     return ""
-// }
 
 fn internalApprove(to: Address, tokenId: u64) {
     storage.tokenApprovals.insert(tokenId, to);
 }
 
 fn getSender() -> Address {
-    let unwrapped = 
-    if let Result::Ok(inner_value) = msg_sender() {
-            inner_value
-    } else {
-            revert(0);
+    let unwrapped = match msg_sender() {
+        Result::Ok(innver_value) => inner_value,
+        _ => revert(0),
     };
 
-    let ad = if let Sender::Address(addr) = unwrapped {
-        addr
-    } else {
-        revert(0);
+    let ad = match unwrapped {
+        Sender::Address(addr) => addr,
+        _ => revert(0),
     };
     ad
 }
@@ -150,7 +134,7 @@ fn internalTransfer(from: Address, to: Address, tokenId: u64) {
     storage.balances.insert(to, storage.balances.get(from) + 1);
     storage.owners.insert(tokenId, to);
 
-    afterTokenTransfer();
+    afterTokenTransfer(from, to, tokenId);
 }
 
 pub fn mint(to: Address, tokenId: u64) {
@@ -173,7 +157,7 @@ pub fn burn(tokenId: u64) {
     approve(Address::from(0), tokenId);
     storage.balances.insert(owner, storage.balances.get(owner) - 1);
     //deleting the owner
-    storage.owners.insert(tokenId, Address:from(0));
+    storage.owners.insert(tokenId, Address::from(0));
 
     afterTokenTransfer(owner, Address::from(0), tokenId);
 }
