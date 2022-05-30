@@ -5,3 +5,4 @@ license = "Apache-2.0"
 name = "FRC721"
 
 [dependencies]
+std = { path = "/home/swaystar/programming/fuel/sway/sway-lib-std" }
