@@ -40,9 +40,7 @@ impl MyContract for Contract {
     }
 
     pub fn ownerOf(tokenId: u64) -> Address {
-        let owner: Address = storage.owners.get(tokenId);
-        require(owner != ~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000), "FRC721: Owner query for non-existant token");
-        return owner;
+        return internalOwnerOf(tokenId);
     }
 
     pub fn getName() -> str[11] {
@@ -54,19 +52,15 @@ impl MyContract for Contract {
     }
 
     pub fn isApprovedForAll(owner: Address, operator: Address) -> bool {
-        return storage.operatorApprovals.get(owner).get(operator);
+        return internalIsApprovedForAll(owner, operator);
     }
 
     pub fn approve(to: Address, tokenId: u64) {
-        let x = abi(MyContract, contract_id().value);
-        let owner = x.ownerOf(tokenId);
-        require(to != owner, "FRC721: approval to current owner");
-        require((getSender() == owner) || x.isApprovedForAll(owner, getSender()), "FRC721: approve caller is not token owner nor approved for all");
+        return internalApprove(to, tokenId);
     }
 
     pub fn getApproved(tokenId: u64) -> Address {
-        require(exists(tokenId), "FRC721: approved query for nonexistent token");
-        return storage.tokenApprovals.get(tokenId);
+        return internalGetApproved(tokenId);
     }
 
     pub fn setApprovalForAll(operator: Address, approved: bool) {
@@ -80,16 +74,6 @@ impl MyContract for Contract {
     }
 }
 
-
-
-fn exists(tokenId: u64) -> bool {
-    return storage.owners.get(tokenId) != ~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000);
-}
-
-fn internalApprove(to: Address, tokenId: u64) {
-    storage.tokenApprovals.insert(tokenId, to);
-}
-
 fn getSender() -> Address {
     let unwrapped = match msg_sender() {
         Result::Ok(inner_value) => inner_value, _ => revert(0), 
@@ -101,15 +85,43 @@ fn getSender() -> Address {
     ad
 }
 
+fn internalOwnerOf(tokenId: u64) -> Address {
+    let owner: Address = storage.owners.get(tokenId);
+    require(owner != ~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000), "FRC721: Owner query for non-existant token");
+    return owner;
+}
+
+fn internalIsApprovedForAll(owner: Address, operator: Address) -> bool {
+    return storage.operatorApprovals.get(owner).get(operator);
+}
+
+fn internalApprove(to: Address, tokenId: u64) {
+    let owner = internalOwnerOf(tokenId);
+    require(to != owner, "FRC721: approval to current owner");
+    require((getSender() == owner) || internalIsApprovedForAll(owner, getSender()), "FRC721: approve caller is not token owner nor approved for all");
+}
+
+fn internalGetApproved(tokenId: u64) -> Address {
+    require(exists(tokenId), "FRC721: approved query for nonexistent token");
+    return storage.tokenApprovals.get(tokenId);
+}
+
+fn exists(tokenId: u64) -> bool {
+    return storage.owners.get(tokenId) != ~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000);
+}
+
+fn internalApprove(to: Address, tokenId: u64) {
+    storage.tokenApprovals.insert(tokenId, to);
+}
+
 fn internalSetApprovalForAll(owner: Address, operator: Address, approved: bool) {
     require(owner != operator, "FRC721: approve to caller");
     storage.operatorApprovals.get(owner).insert(operator, approved);
 }
 
 fn isApprovedOrOwner(spender: Address, tokenId: u64) -> bool {
-    let x = abi(MyContract, contract_id().value);
-    let owner = x.ownerOf(tokenId);
-    return(spender == owner || x.isApprovedForAll(owner, spender) || x.getApproved(tokenId) == spender);
+    let owner = internalOwnerOf(tokenId);
+    return(spender == owner || internalIsApprovedForAll(owner, spender) || internalGetApproved(tokenId) == spender);
 }
 
 fn beforeTokenTransfer(from: Address, to: Address, tokenId: u64) {
@@ -121,14 +133,13 @@ fn afterTokenTransfer(from: Address, to: Address, tokenId: u64) {
 }
 
 fn internalTransfer(from: Address, to: Address, tokenId: u64) {
-    let x = abi(MyContract, contract_id().value);
-    require(x.ownerOf(tokenId) == from, "FRC721: transfer from incorrect owner");
+    require(internalOwnerOf(tokenId) == from, "FRC721: transfer from incorrect owner");
     require(to != ~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000), "FRC721: transfer to the zero address");
 
     beforeTokenTransfer(from, to, tokenId);
 
     //clear approvals from previous owner
-    x.approve(~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000), tokenId);
+    internalApprove(~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000), tokenId);
 
     storage.balances.insert(from, storage.balances.get(from) - 1);
     storage.balances.insert(to, storage.balances.get(from) + 1);
@@ -150,12 +161,11 @@ pub fn mint(to: Address, tokenId: u64) {
 }
 
 pub fn burn(tokenId: u64) {
-    let x = abi(MyContract, contract_id().value);
-    let owner: Address = x.ownerOf(tokenId);
+    let owner: Address = internalOwnerOf(tokenId);
 
     beforeTokenTransfer(owner, ~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000), tokenId);
 
-    x.approve(~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000), tokenId);
+    internalApprove(~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000), tokenId);
     storage.balances.insert(owner, storage.balances.get(owner) - 1);
     //deleting the owner
     storage.owners.insert(tokenId, ~Address::from(0x0000000000000000000000000000000000000000000000000000000000000000));
