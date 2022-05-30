@@ -22,10 +22,6 @@ abi MyContract {
 }
 
 storage {
-    //change str lengths to length of respective strings
-    name: str[11] = "example-nft",
-    symbol: str[6] = "ex-nft",
-
     //Maps the NFT id to an owner address, note- this means contracts cannot own NFTs with this model
     owners: StorageMap<u64, Address> = StorageMap::new::<u64, Address>, //How many tokens each address holds
     balances: StorageMap<Address, u64> = StorageMap::new::<Address, u64>, //Token id to approved address
@@ -50,11 +46,11 @@ impl MyContract for Contract {
     }
 
     pub fn getName() -> str[11] {
-        return storage.name;
+        return "example-nft";
     }
 
     pub fn getSymbol() -> str[6] {
-        return storage.symbol;
+        return "ex-nft";
     }
 
     pub fn isApprovedForAll(owner: Address, operator: Address) -> bool {
